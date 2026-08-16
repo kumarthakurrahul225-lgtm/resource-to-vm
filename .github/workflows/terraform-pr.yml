@@ -2,9 +2,10 @@ name: Terraform Apply (Main)
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'resource-to-vm/**'
+    branches:
+      - main
+
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -90,4 +91,4 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform apply -auto-approve tfplan 
+        run: terraform apply -auto-approve tfplan
