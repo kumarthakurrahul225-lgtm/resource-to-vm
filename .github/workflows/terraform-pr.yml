@@ -1,0 +1,93 @@
+name: Terraform Apply (Main)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'resource-to-vm/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: resource-to-vm
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: 71862bad-3fd8-4260-b39e-0523e377383c
+  ARM_SUBSCRIPTION_ID: 7d387c43-6ded-4e1b-9e55-62ae5a5daf48
+  ARM_TENANT_ID: e03a6c02-8d3f-4693-871e-3e2ec1418d3a
+
+jobs:
+
+  # Stage 1: Security Scan
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ${{ env.TF_WORKING_DIR }}
+
+  # Stage 2: Terraform Plan
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: scan
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+
+  # Stage 3: Terraform Apply
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: plan
+    environment: production
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan 
